@@ -16,16 +16,17 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 
 	// game config defaults
 	var config = {
-		levels: 3,
-		branches: 4,
+		levels: 10,
+		branches: 2,
 		rotation: Math.PI * 0.5, 
 		apperture: Math.PI * 0.25,
 		size: 50,
-		sizeMultiplier: 1.0,
+		sizeMultiplier: 0.8,
 		rotationMultiplier: 1.0,
 		appertureMultiplier: 1.0,
 		treeColor: '#000000',
 		leafSize: 10,
+		leafSizeVar: 5,
 		leafColor1:'#f0d0f7',
 		leafColor2: '#e9ccf0',
 		leafColor3: '#ebc0f5'
@@ -51,8 +52,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 			rotation: 0,
 			apperture: 0,
 			size: 0,
-			x:0,
-			y:0
+			position: {x:0, y:0},
+			offset: {x:0, y:0}
 		},
 
 		initialize: function() {
@@ -66,23 +67,33 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 
 		addNode: function(aNode) {
 			aNode.setParent(this);
+			aNode.calculateNewOffset();
+			aNode.refresh();
+
 			return this.get('children').add(aNode);
 		},
 
-		refresh: function() {
+		calculateNewOffset: function() {
 			var parent = this.get('parent');
 			var apperture = parent.get('apperture') * config.appertureMultiplier;
 			var rotation = parent.get('rotation') * config.rotationMultiplier;
 			rotation += Math.random() * 2 * apperture - apperture;
 			var size = parent.get('size') * config.sizeMultiplier;
 			this.set('size', size);
-			var offset = {
+			this.set('offset', {
 				x: size * Math.cos(rotation),
 				y: size * Math.sin(rotation)
-			};
+			});
 			this.set('rotation', rotation);
 			this.set('apperture', apperture);
-			this.setPosition(parent.get('x') + offset.x, parent.get('y') - offset.y );
+		},
+
+		refresh: function() {
+			var parent = this.get('parent');
+			if(parent) {
+				this.setPosition(parent.get('position').x + this.get('offset').x,
+								 parent.get('position').y - this.get('offset').y );
+			}
 
 			this.get('children').refresh();
 		},
@@ -92,8 +103,7 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 		},
 
 		setPosition: function (x, y) {
-			this.set('x', x);
-			this.set('y', y);
+			this.set('position', {x:x, y:y});
 		},
 
 		dispose: function() {
@@ -128,10 +138,10 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 		},
 
 		update: function(elapsed) {
-	    	this.get('line').vertices[0].x = this.get('nodeA').get('x');
-	        this.get('line').vertices[0].y = this.get('nodeA').get('y');
-	        this.get('line').vertices[1].x = this.get('nodeB').get('x');
-	        this.get('line').vertices[1].y = this.get('nodeB').get('y');
+	    	this.get('line').vertices[0].x = this.get('nodeA').get('position').x;
+	        this.get('line').vertices[0].y = this.get('nodeA').get('position').y;
+	        this.get('line').vertices[1].x = this.get('nodeB').get('position').x;
+	        this.get('line').vertices[1].y = this.get('nodeB').get('position').y;
 		},
 
 		dispose: function() {
@@ -167,8 +177,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 		},
 
 		update: function(elapsed) {
-	    	this.get('view').translation.x = this.get('nodeA').get('x');
-	        this.get('view').translation.y = this.get('nodeA').get('y');
+	    	this.get('view').translation.x = this.get('nodeA').get('position').x;
+	        this.get('view').translation.y = this.get('nodeA').get('position').y;
 		},
 
 		dispose: function() {
@@ -221,8 +231,7 @@ require(['jquery','underscore','backbone','two', 'datgui'],
     			size: config.size,
     			apperture: config.apperture,
     			rotation: config.rotation,
-    			x: two.width * 0.5,
-    			y: two.height * 0.5
+    			position: {x:two.width * 0.5, y:two.height * 0.7}
     		});
 
     		this.addNodes(tree, config.levels, config.branches);
@@ -231,7 +240,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
     	},
 
     	createLeaf: function () {
-    		var leaf = two.makeCircle(two.width / 2, two.height / 2, config.leafSize);
+    		var leaf = two.makeCircle(two.width / 2, two.height / 2,
+    			config.leafSize + config.leafSizeVar * (Math.random()*2-1));
           	leaf.noStroke().fill = this.getLeafColor();
     		// body...
     		return leaf;
@@ -315,6 +325,7 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 
 		var f2_leaves = f2.addFolder('Leaves');
 			f2_leaves.add(config, 'leafSize');
+			f2_leaves.add(config, 'leafSizeVar');
 			f2_leaves.addColor(config, 'leafColor1');
 			f2_leaves.addColor(config, 'leafColor2');
 			f2_leaves.addColor(config, 'leafColor3');
