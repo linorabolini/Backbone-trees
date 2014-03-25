@@ -21,9 +21,13 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 		rotation: Math.PI * 0.5, 
 		apperture: Math.PI * 0.25,
 		size: 50,
+		branchWidth: 100,
+		branchSubDivs: 1,
 		sizeMultiplier: 0.8,
 		rotationMultiplier: 1.0,
 		appertureMultiplier: 1.0,
+		branchingM: 0.2,
+		levelM: 0.5,
 		treeColor: '#000000',
 		leafSize: 10,
 		leafSizeVar: 5,
@@ -65,20 +69,25 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 			this.refresh();
 		},
 
-		addNode: function(aNode) {
+		addNode: function(aNode, reduceSize) {
 			aNode.setParent(this);
-			aNode.calculateNewOffset();
+			aNode.calculateNewOffset(reduceSize);
 			aNode.refresh();
 
 			return this.get('children').add(aNode);
 		},
 
-		calculateNewOffset: function() {
+		calculateNewOffset: function(reduceSize) {
 			var parent = this.get('parent');
 			var apperture = parent.get('apperture') * config.appertureMultiplier;
 			var rotation = parent.get('rotation') * config.rotationMultiplier;
 			rotation += Math.random() * 2 * apperture - apperture;
-			var size = parent.get('size') * config.sizeMultiplier;
+
+			var sizeReduction = 1;
+			if(reduceSize) {
+				sizeReduction = config.sizeMultiplier;
+			}
+			var size = parent.get('size') * sizeReduction;
 			this.set('size', size);
 			this.set('offset', {
 				x: size * Math.cos(rotation),
@@ -222,7 +231,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 
 	    	this.treeTop = this.buildTree();
     		
-    		two.bind('update', app.update);
+    		app.update();
+    		//two.bind('update', app.update);
     	},
 
     	buildTree: function () {
@@ -234,7 +244,7 @@ require(['jquery','underscore','backbone','two', 'datgui'],
     			position: {x:two.width * 0.5, y:two.height * 0.7}
     		});
 
-    		this.addNodes(tree, config.levels, config.branches);
+    		this.addNodes(tree, config.levels, config.branches, config.branchSubDivs);
 
     		return tree;
     	},
@@ -256,7 +266,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 
 
 
-    	addNodes: function(nodeA, level, qty) {
+    	addNodes: function(nodeA, level, qty, currentDiv) {
+    		// leaf creation
 			if(level <= 0) {
 				var view = this.createLeaf();
 				var leaf = new Leaf({
@@ -266,22 +277,32 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 				leaves.add(leaf);
 				return;
 			}
+
+			// empty subdivision
+			if(currentDiv > 0) {
+				var nodeB = new Node();
+				this.joinNodes(nodeA, nodeB, false);
+				this.addNodes(nodeB, level, qty, --currentDiv);
+				return;
+			}
 			
+			// branch division
 			for( var i=0; i < qty; ++i) {
 				var lvl = level;
+				var q = qty;
 				var nodeB = new Node();
-				this.joinNodes(nodeA, nodeB);
-				if(Math.random() > 0.5) --lvl;
-				this.addNodes(nodeB, --lvl, qty);
+				this.joinNodes(nodeA, nodeB, true);
+				if(Math.random() > config.levelM) --lvl;
+				if(Math.random() > config.branchingM) --q;
+				this.addNodes(nodeB, --lvl, q, config.branchSubDivs);
 			};
     	},
 
-    	joinNodes: function(nodeA, nodeB) {
-			nodeA.addNode(nodeB);
+    	joinNodes: function(nodeA, nodeB, withSizeReduction) {
+			nodeA.addNode(nodeB, withSizeReduction);
 			var line = two.makeLine(0,0,0,0);
 			line.stroke = config.treeColor;
-  			line.linewidth = (nodeA.get('size') + nodeB.get('size')) * 0.25 * 0.1;
-  			line.curved = true;
+  			line.linewidth = (nodeA.get('size') + nodeB.get('size')) * (1 / config.branchWidth);
 			var branch = new Branch({
 	    		nodeA: nodeA,
 	    		nodeB: nodeB,
@@ -297,7 +318,7 @@ require(['jquery','underscore','backbone','two', 'datgui'],
     	},
 
     	dispose: function() {
-    		two.unbind('update', app.update);
+    		//two.unbind('update', app.update);
     		branches.dispose();
     		leaves.dispose();
     	},
@@ -320,6 +341,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 			f2_tree.add(config, 'apperture', 0, Math.PI);
 			f2_tree.add(config, 'rotation', 0, Math.PI);
 			f2_tree.add(config, 'size', 0, 150);
+			f2_tree.add(config, 'branchWidth', 0, 200);
+			f2_tree.add(config, 'branchSubDivs', 1, 100);
 			f2_tree.addColor(config, 'treeColor');
 		f2_tree.open();
 
@@ -335,6 +358,8 @@ require(['jquery','underscore','backbone','two', 'datgui'],
 			f2_multiplier.add(config, 'sizeMultiplier', 0, 1);
 			f2_multiplier.add(config, 'rotationMultiplier', 0, 1);
 			f2_multiplier.add(config, 'appertureMultiplier', 0, 1);
+			f2_multiplier.add(config, 'branchingM', 0, 1);
+			f2_multiplier.add(config, 'levelM', 0, 1);
 		f2_multiplier.open();
 
 
